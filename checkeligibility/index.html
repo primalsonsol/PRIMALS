@@ -34,6 +34,7 @@
     --text-muted: #8A6A6A;
     --border: rgba(192,17,10,0.25);
     --green: #3FBF6A;
+    --gold: #D6A84A;
   }
 
   html { scroll-behavior: smooth; }
@@ -134,6 +135,17 @@
     inset: 0;
     background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(120,8,4,0.35) 0%, transparent 70%);
     pointer-events: none;
+    animation: glowBreathe 7s ease-in-out infinite;
+    transform-origin: 50% 40%;
+  }
+
+  @keyframes glowBreathe {
+    0%, 100% { opacity: 0.85; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bg-glow { animation: none; }
   }
 
   .wrap {
@@ -238,6 +250,7 @@
   .check-btn.loading .btn-spinner { display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Eligibility result message — glass panel */
   .msg {
     margin-top: 1rem;
     font-size: 0.85rem;
@@ -247,6 +260,10 @@
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 0.35s ease, transform 0.35s ease;
+
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
   }
   .msg.show {
     display: block;
@@ -254,19 +271,19 @@
     transform: translateY(0);
   }
   .msg.error {
-    color: #FF8A82;
-    border-color: rgba(224,26,16,0.4);
-    background: rgba(192,17,10,0.08);
+    color: #FF6B6B;
+    border-color: rgba(122,8,4,0.55);
+    background: rgba(122,8,4,0.22);
   }
   .msg.success {
     color: #C9F5D8;
-    border-color: rgba(63,191,106,0.4);
-    background: rgba(63,191,106,0.08);
+    border-color: rgba(63,191,106,0.45);
+    background: rgba(63,191,106,0.14);
   }
   .msg.neutral {
-    color: var(--text-muted);
-    border-color: var(--border);
-    background: rgba(192,17,10,0.06);
+    color: #C4B49A;
+    border-color: rgba(180,160,130,0.4);
+    background: rgba(180,160,130,0.15);
   }
 
   .phase-tag {
@@ -284,6 +301,81 @@
     margin-bottom: 0.4rem;
   }
 
+  .msg-body {
+    opacity: 1;
+    transition: opacity 0.22s ease;
+  }
+
+  .check-sequence {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.08em;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transform: translateX(-6px);
+    animation: rowIn 0.3s ease forwards;
+    transition: opacity 0.25s ease;
+  }
+  .check-row.is-match { color: #C9F5D8; }
+  .check-row.is-no-match { color: #E0645C; opacity: 0.8; }
+
+  @keyframes rowIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .check-row-status {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+  }
+  .check-row-status.pending::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: pendingPulse 0.9s ease-in-out infinite;
+  }
+  @keyframes pendingPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.25); }
+  }
+  .check-row-status.match { color: #3FBF6A; }
+  .check-row-status.match::before { content: '\2713'; }
+  .check-row-status.no-match { color: #E0645C; }
+  .check-row-status.no-match::before { content: '\2715'; }
+  .check-row-status.match,
+  .check-row-status.no-match {
+    animation: statusPop 0.3s ease;
+  }
+  @keyframes statusPop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .check-row { animation: none; opacity: 1; transform: none; }
+    .check-row-status.pending::before { animation: none; }
+    .check-row-status.match,
+    .check-row-status.no-match { animation: none; }
+    .msg-body { transition: none; }
+  }
+
   .phase-chip {
     display: inline-block;
     font-family: 'Bebas Neue', sans-serif;
@@ -293,6 +385,17 @@
     border: 1px solid rgba(63,191,106,0.5);
     background: rgba(63,191,106,0.1);
     color: #C9F5D8;
+    opacity: 0;
+    transform: translateY(4px) scale(0.94);
+    animation: chipPop 0.4s ease forwards;
+  }
+
+  @keyframes chipPop {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .phase-chip { animation: none; opacity: 1; transform: none; }
   }
 
   footer {
@@ -354,7 +457,7 @@
           <span class="btn-label">Check</span>
         </button>
       </div>
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg"><div class="msg-body" id="msgBody"></div></div>
     </div>
   </div>
 </main>
@@ -369,6 +472,7 @@
   const btn = document.getElementById('checkBtn');
   const btnLabel = btn.querySelector('.btn-label');
   const msg = document.getElementById('msg');
+  const msgBody = document.getElementById('msgBody');
 
   // Base58, 32-44 chars — standard Solana address shape (excludes 0, O, I, l).
   const SOLANA_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -414,9 +518,8 @@
   }
 
   function showMsg(text, type) {
-    msg.textContent = '';
     msg.className = 'msg ' + type;
-    msg.textContent = text;
+    msgBody.textContent = text;
     // reflow so the fade-in transition replays every time, even for the same type
     void msg.offsetWidth;
     msg.classList.add('show');
@@ -424,17 +527,123 @@
 
   function showPhaseMsg(label, text, type) {
     msg.className = 'msg ' + type;
-    msg.innerHTML = '<span class="phase-tag">' + label + '</span><br>' + text;
+    msgBody.innerHTML = '<span class="phase-tag">' + label + '</span><br>' + text;
     void msg.offsetWidth;
     msg.classList.add('show');
   }
 
   function showMultiPhaseMsg(labels, text, type) {
-    const chips = labels.map(l => '<span class="phase-chip">' + l + '</span>').join('');
+    const chips = labels
+      .map((l, i) => '<span class="phase-chip" style="animation-delay:' + (i * 90) + 'ms">' + l + '</span>')
+      .join('');
     msg.className = 'msg ' + type;
-    msg.innerHTML = '<div class="phase-tags">' + chips + '</div>' + text;
+    msgBody.innerHTML = '<div class="phase-tags">' + chips + '</div>' + text;
     void msg.offsetWidth;
     msg.classList.add('show');
+  }
+
+  // Swaps msgBody's content in place: fades the old content out, morphs the
+  // panel to the new content's height, then fades the new content in. The
+  // outer .msg panel (border/background) never disappears — only the
+  // content inside it changes, so it reads as one continuous panel.
+  function crossfadeMsgBody(renderFn) {
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      renderFn();
+      return;
+    }
+
+    const cs = getComputedStyle(msg);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const startHeight = msg.getBoundingClientRect().height;
+
+    msg.style.height = startHeight + 'px';
+    msg.style.overflow = 'hidden';
+    msg.style.transition = 'height 0.32s ease';
+    msgBody.style.opacity = '0';
+
+    setTimeout(() => {
+      renderFn();
+      void msgBody.offsetWidth;
+      const targetHeight = msgBody.scrollHeight + padY;
+      msg.style.height = targetHeight + 'px';
+      msgBody.style.opacity = '1';
+
+      setTimeout(() => {
+        // Release the fixed height once settled so the panel stays fluid.
+        msg.style.height = '';
+        msg.style.overflow = '';
+        msg.style.transition = '';
+      }, 340);
+    }, 220);
+  }
+
+  function revealFinalEligibility(matched) {
+    crossfadeMsgBody(() => {
+      setLoading(false);
+      if (matched.length === 0) {
+        msg.className = 'msg neutral show';
+        msgBody.innerHTML = '<span class="phase-tag">PUBLIC PHASE</span><br>' +
+          "This wallet isn't on an allowlist. You'll be able to mint during the Public phase.";
+      } else if (matched.length === 1) {
+        msg.className = 'msg success show';
+        msgBody.innerHTML = '<span class="phase-tag">' + matched[0] + ' PHASE</span><br>' +
+          "You're eligible to mint during the " + matched[0] + " phase.";
+      } else {
+        msg.className = 'msg success show';
+        const nice = matched.join(', ').replace(/, ([^,]*)$/, ' & $1');
+        const chips = matched
+          .map((p, i) => '<span class="phase-chip" style="animation-delay:' + (i * 90) + 'ms">' + p + ' PHASE</span>')
+          .join('');
+        msgBody.innerHTML = '<div class="phase-tags">' + chips + '</div>' +
+          "You're eligible to mint during the " + nice + " phases.";
+      }
+    });
+  }
+
+  function showEligibilityCheckSequence(matched) {
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      revealFinalEligibility(matched);
+      return;
+    }
+
+    const phases = ['OG', 'WL', 'WL2'];
+    // Neutral shell while rows are still resolving — the final class
+    // (success/neutral) is applied once revealFinalEligibility lands,
+    // so a no-match result doesn't sit inside a green "success" panel
+    // while it's still being decided.
+    msg.className = 'msg neutral';
+    msgBody.innerHTML = '<div class="check-sequence">' +
+      phases.map((p, i) =>
+        '<div class="check-row" data-phase="' + p + '" style="animation-delay:' + (i * 90) + 'ms">' +
+          '<span>' + p + ' PHASE</span>' +
+          '<span class="check-row-status pending"></span>' +
+        '</div>'
+      ).join('') +
+      '</div>';
+    void msg.offsetWidth;
+    msg.classList.add('show');
+
+    let i = 0;
+    function resolveNext() {
+      if (i >= phases.length) {
+        setTimeout(() => revealFinalEligibility(matched), 450);
+        return;
+      }
+      const phase = phases[i];
+      const row = msgBody.querySelector('.check-row[data-phase="' + phase + '"]');
+      if (row) {
+        const statusEl = row.querySelector('.check-row-status');
+        const isMatch = matched.includes(phase);
+        statusEl.className = 'check-row-status ' + (isMatch ? 'match' : 'no-match');
+        row.classList.add(isMatch ? 'is-match' : 'is-no-match');
+      }
+      i++;
+      setTimeout(resolveNext, 420);
+    }
+    // Let the rows finish entering before the first one resolves.
+    setTimeout(resolveNext, 400);
   }
 
   function isSolanaAddress(addr) {
@@ -479,9 +688,8 @@
       await wait(MIN_CHECK_MS - elapsed);
     }
 
-    setLoading(false);
-
     if (loadError || !lists) {
+      setLoading(false);
       showMsg('Could not load eligibility data. Please refresh or try again shortly.', 'error');
       return;
     }
@@ -491,19 +699,10 @@
     if (lists.WL.has(addr)) matched.push('WL');
     if (lists.WL2.has(addr)) matched.push('WL2');
 
-    if (matched.length === 0) {
-      showPhaseMsg('PUBLIC PHASE', "This wallet isn't on an allowlist. You'll be able to mint during the Public phase.", 'neutral');
-    } else if (matched.length === 1) {
-      const phase = matched[0];
-      showPhaseMsg(phase + ' PHASE', "You're eligible to mint in the " + phase + " phase.", 'success');
-    } else {
-      const nice = matched.join(', ').replace(/, ([^,]*)$/, ' & $1');
-      showMultiPhaseMsg(
-        matched.map(p => p + ' PHASE'),
-        "You're eligible to mint in the " + nice + " phases.",
-        'success'
-      );
-    }
+    // Button stays in its loading state through the full row-by-row check
+    // sequence regardless of outcome — showEligibilityCheckSequence turns
+    // it off (via revealFinalEligibility) once the final result is on screen.
+    showEligibilityCheckSequence(matched);
   }
 
   btn.addEventListener('click', handleCheck);
