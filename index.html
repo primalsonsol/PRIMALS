@@ -146,6 +146,27 @@
     margin-left: 0.15rem;
   }
 
+  #top-ticker .ticker-live-dot {
+    display: none;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red-bright);
+    box-shadow: 0 0 6px rgba(224,26,16,0.9), 0 0 12px rgba(224,26,16,0.5);
+    animation: ticker-live-breathe 1.8s ease-in-out infinite;
+  }
+  #top-ticker .ticker-live-dot.active {
+    display: block;
+  }
+  @keyframes ticker-live-breathe {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.72); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #top-ticker .ticker-live-dot { animation: none; opacity: 1; }
+  }
+
   @media (max-width: 720px) {
     #top-ticker {
       height: var(--ticker-h-mobile);
@@ -2165,6 +2186,7 @@
 <body>
 
 <div id="top-ticker" role="status" aria-live="polite">
+  <span class="ticker-live-dot" id="ticker-live-dot" aria-hidden="true"></span>
   <span class="ticker-icons">
     <img src="primals-claw.jpg" alt="" class="ticker-icon ticker-icon-claw" />
     <img src="orbis-icon.png" alt="" class="ticker-icon ticker-icon-orbis" />
@@ -2645,7 +2667,7 @@ if (recapImgWrap) observer.observe(recapImgWrap);
     { name: "Astral Primal", img: "AstralPrimal.jpg", lore: "A star touched evolution of the unfinished lineage, forever suspended between primal instinct and transcendent knowledge." },
    { name: "Captain Cloud", img: "CaptainCloud.jpg", lore: "Crowned in pure gold, this Primal King lights his cigar with the remnants of fallen empires and exhales pure dominance." },
     { name: "Primal King", img: "PrimalKing.jpg", lore: "Before the maps were drawn and the stars were named, Captain Cloud sailed the unseen currents between worlds seeking the Awakening." },
-   { name: "Commander Prime", img: "CommanderPrime.jpg", lore: "The unfinished Primal who rose from instinct to lead the Awakening’s first true army." },
+   { name: "Commander Prime", img: "CommanderPrime.jpg", lore: "The unfinished Primal who rose from instinct to lead the Awakening's first true army." },
     { name: "Infernal Warlord", img: "InfernalWarlord.jpg", lore: "Born of the old blood, the Infernal Warlord rejected the slow crawl of evolution and forged himself in primordial blaze." },
     { name: "OG Primal", img: "OGPrimal.jpg", lore: "The last white furred oracle, the eyes of OG Primal are forever locked on the next big score, smoking the signal that wakes the ancient code." },
     { name: "Galactic Primal", img: "GalacticPrimal.jpg", lore: "The Galactic Primal, wearing the cosmos in his fur and the future in his lenses, forever racing the next Awakening." },
@@ -2850,6 +2872,7 @@ if (recapImgWrap) observer.observe(recapImgWrap);
   const labelEl = document.getElementById('ticker-label');
   const timeEl = document.getElementById('ticker-time');
   const linkEl = document.getElementById('ticker-link');
+  const liveDotEl = document.getElementById('ticker-live-dot');
   const dEl = document.getElementById('ticker-days');
   const hEl = document.getElementById('ticker-hours');
   const mEl = document.getElementById('ticker-mins');
@@ -2866,6 +2889,7 @@ if (recapImgWrap) observer.observe(recapImgWrap);
       if (timer) clearInterval(timer);
       labelEl.textContent = 'AWAKENING NOW ON ORBIS';
       timeEl.style.display = 'none';
+      if (liveDotEl) liveDotEl.classList.add('active');
       if (linkEl) {
         linkEl.textContent = 'Mint now →';
         linkEl.href = MINT_URL;
@@ -2889,49 +2913,30 @@ if (recapImgWrap) observer.observe(recapImgWrap);
   timer = setInterval(render, 1000);
 })();
 
-// Art contest countdown — compact D:H:M:S timer, target date shown below the frame.
-// On expiry: mute the whole contest section and show the "ended, winners on mint day" banner
-// so the spotlight shifts to the Orbis mint section above it.
+// Art contest — fully remove the entire section (and its leading divider)
+// once we hit 25 Aug 2026, 11:00 PM UTC (= 26 Aug 2026, 12:00 AM WAT).
+// Runs on load: if the deadline has already passed, the section is
+// stripped from the DOM immediately with no flash of content.
 (function() {
-  const TARGET = Date.UTC(2026, 7, 15, 17, 0, 0); // 15 Aug 2026, 5:00 PM UTC
+  const REMOVE_DATE = Date.UTC(2026, 7, 25, 23, 0, 0); // 25 Aug 2026, 11:00 PM UTC
 
-  const contestSection = document.getElementById('contest');
-  const unitsEl = document.getElementById('contest-countdown-units');
-  const endedEl = document.getElementById('contest-countdown-ended');
-  const bannerEl = document.getElementById('contest-ended-banner');
-  const dEl = document.getElementById('cc-days');
-  const hEl = document.getElementById('cc-hours');
-  const mEl = document.getElementById('cc-mins');
-  const sEl = document.getElementById('cc-secs');
-  if (!unitsEl || !endedEl) return;
+  function removeContestSection() {
+    const section = document.getElementById('contest');
+    if (!section) return;
 
-  let timer = null;
-  function pad(n) { return String(n).padStart(2, '0'); }
-
-  function render() {
-    const diff = TARGET - Date.now();
-
-    if (diff <= 0) {
-      if (timer) clearInterval(timer);
-      unitsEl.style.display = 'none';
-      endedEl.style.display = 'block';
-      if (contestSection) contestSection.classList.add('contest-ended');
-      return;
+    const prevDivider = section.previousElementSibling;
+    if (prevDivider && prevDivider.classList.contains('divider')) {
+      prevDivider.remove();
     }
-
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-
-    dEl.textContent = pad(days);
-    hEl.textContent = pad(hours);
-    mEl.textContent = pad(mins);
-    sEl.textContent = pad(secs);
+    section.remove();
   }
 
-  render();
-  timer = setInterval(render, 1000);
+  const now = Date.now();
+  if (now >= REMOVE_DATE) {
+    removeContestSection();
+  } else {
+    setTimeout(removeContestSection, REMOVE_DATE - now);
+  }
 })();
 </script>
 
