@@ -2132,6 +2132,47 @@
     color: var(--text-muted);
   }
 
+  /* Live mint progress — replaces the countdown once mint is live */
+  .orbis-progress {
+    width: 100%;
+    min-width: 220px;
+  }
+  .orbis-progress-count {
+    font-family: 'Cinzel', serif;
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 14px rgba(224,26,16,0.6);
+    margin-bottom: 0.7rem;
+  }
+  .orbis-progress-suffix {
+    display: block;
+    margin-top: 0.2rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .orbis-progress-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .orbis-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red-deep), var(--red-bright));
+    box-shadow: 0 0 10px rgba(224,26,16,0.7);
+    transition: width 0.6s ease;
+  }
+  @media (max-width: 860px) {
+    .orbis-progress { min-width: 0; }
+  }
+
   .orbis-mint-btn {
     margin-top: 1.4rem;
     padding: 0.85rem 2.25rem;
@@ -2241,8 +2282,7 @@
     <p class="hero-sub">An ancient species awakens. Evolution is not a destination, it is a reckoning.</p>
     <div class="hero-actions">
       <div class="hero-actions-row">
-        <a href="/checkeligibility" class="btn-solid btn-glow">Check Eligibility</a>
-        <a href="/primaldash" target="_blank" class="btn-solid">Play Primal Dash</a>
+        <a href="/primaldash" target="_blank" class="btn-solid btn-glow">Play Primal Dash</a>
       </div>
       <div class="hero-actions-row">
         <a href="https://discord.gg/ZRrWFfRVez" target="_blank" class="btn-outline">Join Discord</a>
@@ -2309,8 +2349,19 @@
         <a href="https://www.orbisonsol.io/mint/primals" target="_blank" class="btn-solid orbis-mint-btn" id="orbis-mint-btn" style="display: none;">Mint on Orbis</a>
       </div>
 
-      <div class="orbis-panel-right">
-        <p class="orbis-supply">5,555<span>Primals</span></p>
+      <div class="orbis-panel-right" id="orbis-panel-right">
+        <p class="orbis-supply" id="orbis-supply-total">3,333<span>Primals</span></p>
+
+        <!-- Live mint progress — hidden until minting is actually live (see script) -->
+        <div class="orbis-progress" id="orbis-progress" style="display: none;">
+          <p class="orbis-progress-count">
+            <span id="orbis-minted-count">0</span> / <span id="orbis-supply-count">3,333</span>
+            <span class="orbis-progress-suffix">Awakened</span>
+          </p>
+          <div class="orbis-progress-track">
+            <div class="orbis-progress-fill" id="orbis-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2803,11 +2854,80 @@ if (recapImgWrap) observer.observe(recapImgWrap);
   });
 })();
 
-// Orbis mint countdown — large glowing timer that "ticks" on every digit change
-(function() {
-  const TARGET = Date.UTC(2026, 7, 25, 17, 0, 0); // 25 Aug 2026, 5:00 PM UTC
-  const MINT_URL = 'https://www.orbisonsol.io/mint/primals';
+// ══════════════════════════════════════════════════════════
+// MINT STATUS — single source of truth for "how many are
+// minted" and "is the mint sold out".
+//
+// Pulled live, directly from the chain, via Helius's DAS API
+// (getAssetsByGroup) against your verified collection address.
+// No manual updates — this polls Helius every 30s and reflects
+// exactly what's minted on-chain.
+// ══════════════════════════════════════════════════════════
+const HELIUS_API_KEY = '6ec7f959-38ce-415b-bb4c-29e5174bc186';
+const HELIUS_RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=' + HELIUS_API_KEY;
+const COLLECTION_ADDRESS = '96SJ88daKLgWgzKVSCUmLoF7ixnZvykxP6QtHfPcBbFx';
+const MINT_STATUS_POLL_MS = 30000;
+const TOTAL_SUPPLY = 3333;
+const MINT_URL = 'https://www.orbisonsol.io/mint/primals';
+const MINT_START = Date.UTC(2026, 7, 25, 17, 0, 0); // 25 Aug 2026, 5:00 PM UTC
 
+function formatCount(n) {
+  return Number(n).toLocaleString('en-US');
+}
+
+async function fetchMintStatus() {
+  try {
+    const res = await fetch(HELIUS_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'primals-mint-status',
+        method: 'getAssetsByGroup',
+        params: {
+          groupKey: 'collection',
+          groupValue: COLLECTION_ADDRESS,
+          page: 1,
+          limit: 1,
+          options: { showGrandTotal: true }
+        }
+      }),
+      cache: 'no-store'
+    });
+    if (!res.ok) throw new Error('Helius request failed: ' + res.status);
+    const { result, error } = await res.json();
+    if (error) throw new Error(error.message || 'Helius error');
+
+    const minted = Number(result && result.total) || 0;
+    return {
+      minted,
+      totalSupply: TOTAL_SUPPLY,
+      soldOut: minted >= TOTAL_SUPPLY
+    };
+  } catch (err) {
+    console.warn('Mint status fetch failed:', err);
+    return null;
+  }
+}
+
+// Removes the Orbis mint section + sticky top ticker once the
+// mint has fully concluded (sold out).
+function removeMintUI() {
+  const section = document.getElementById('orbis-announcement');
+  if (section) {
+    const prevDivider = section.previousElementSibling;
+    if (prevDivider && prevDivider.classList.contains('divider')) prevDivider.remove();
+    const nextDivider = section.nextElementSibling;
+    section.remove();
+    if (nextDivider && nextDivider.classList.contains('divider')) nextDivider.remove();
+  }
+  const ticker = document.getElementById('top-ticker');
+  if (ticker) ticker.remove();
+  document.documentElement.style.setProperty('--ticker-h', '0px');
+  document.documentElement.style.setProperty('--ticker-h-mobile', '0px');
+}
+
+(function orbisMintController() {
   const labelEl = document.getElementById('orbis-countdown-label');
   const countdownEl = document.getElementById('orbis-countdown');
   const mintBtn = document.getElementById('orbis-mint-btn');
@@ -2815,15 +2935,30 @@ if (recapImgWrap) observer.observe(recapImgWrap);
   const hEl = document.getElementById('orbis-hours');
   const mEl = document.getElementById('orbis-mins');
   const sEl = document.getElementById('orbis-secs');
-  if (!labelEl || !countdownEl) return;
+  const progressWrap = document.getElementById('orbis-progress');
+  const mintedCountEl = document.getElementById('orbis-minted-count');
+  const supplyCountEl = document.getElementById('orbis-supply-count');
+  const progressFillEl = document.getElementById('orbis-progress-fill');
+
+  const tickerLabelEl = document.getElementById('ticker-label');
+  const tickerTimeEl = document.getElementById('ticker-time');
+  const tickerLinkEl = document.getElementById('ticker-link');
+  const tickerLiveDotEl = document.getElementById('ticker-live-dot');
+  const tdEl = document.getElementById('ticker-days');
+  const thEl = document.getElementById('ticker-hours');
+  const tmEl = document.getElementById('ticker-mins');
+  const tsEl = document.getElementById('ticker-secs');
 
   const prev = { d: null, h: null, m: null, s: null };
-  let timer = null;
+  let countdownTimer = null;
+  let statusTimer = null;
+  let mintIsLive = false;
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
   function tick(el, key, val) {
     const str = pad(val);
+    if (!el) return;
     if (prev[key] !== str) {
       el.textContent = str;
       if (prev[key] !== null) {
@@ -2834,18 +2969,13 @@ if (recapImgWrap) observer.observe(recapImgWrap);
     }
   }
 
-  function render() {
-    const diff = TARGET - Date.now();
+  // --- Countdown to mint start (shown until MINT_START passes) ---
+  function renderCountdown() {
+    const diff = MINT_START - Date.now();
 
     if (diff <= 0) {
-      if (timer) clearInterval(timer);
-      labelEl.textContent = 'AWAKEN YOUR PRIMAL NOW';
-      countdownEl.style.display = 'none';
-      if (mintBtn) {
-        mintBtn.textContent = 'MINT ON ORBIS';
-        mintBtn.href = MINT_URL;
-        mintBtn.style.display = 'inline-block';
-      }
+      if (countdownTimer) clearInterval(countdownTimer);
+      switchToLiveMint();
       return;
     }
 
@@ -2858,59 +2988,80 @@ if (recapImgWrap) observer.observe(recapImgWrap);
     tick(hEl, 'h', hours);
     tick(mEl, 'm', mins);
     tick(sEl, 's', secs);
+
+    if (tickerLabelEl && tickerTimeEl) {
+      tickerLabelEl.textContent = 'Minting on Orbis in';
+      tdEl.textContent = pad(days);
+      thEl.textContent = pad(hours);
+      tmEl.textContent = pad(mins);
+      tsEl.textContent = pad(secs);
+    }
   }
 
-  render();
-  timer = setInterval(render, 1000);
-})();
+  // --- Switch the panel + ticker into "mint is live" mode ---
+  function switchToLiveMint() {
+    mintIsLive = true;
+    if (labelEl) labelEl.textContent = 'AWAKEN YOUR PRIMAL NOW';
+    if (countdownEl) countdownEl.style.display = 'none';
+    if (mintBtn) {
+      mintBtn.textContent = 'MINT ON ORBIS';
+      mintBtn.href = MINT_URL;
+      mintBtn.style.display = 'inline-block';
+    }
+    if (progressWrap) progressWrap.style.display = 'block';
 
-// Sticky top ticker — mini live countdown to the same mint target, always visible
-(function() {
-  const TARGET = Date.UTC(2026, 7, 25, 17, 0, 0); // 25 Aug 2026, 5:00 PM UTC
-  const MINT_URL = 'https://www.orbisonsol.io/mint/primals';
-
-  const labelEl = document.getElementById('ticker-label');
-  const timeEl = document.getElementById('ticker-time');
-  const linkEl = document.getElementById('ticker-link');
-  const liveDotEl = document.getElementById('ticker-live-dot');
-  const dEl = document.getElementById('ticker-days');
-  const hEl = document.getElementById('ticker-hours');
-  const mEl = document.getElementById('ticker-mins');
-  const sEl = document.getElementById('ticker-secs');
-  if (!labelEl || !timeEl) return;
-
-  function pad(n) { return String(n).padStart(2, '0'); }
-
-  let timer = null;
-  function render() {
-    const diff = TARGET - Date.now();
-
-    if (diff <= 0) {
-      if (timer) clearInterval(timer);
-      labelEl.textContent = 'AWAKENING NOW ON ORBIS';
-      timeEl.style.display = 'none';
-      if (liveDotEl) liveDotEl.classList.add('active');
-      if (linkEl) {
-        linkEl.textContent = 'Mint now →';
-        linkEl.href = MINT_URL;
-        linkEl.style.display = 'inline';
-      }
-      return;
+    if (tickerLabelEl) tickerLabelEl.textContent = 'Minting live on Orbis';
+    if (tickerTimeEl) tickerTimeEl.style.display = 'none';
+    if (tickerLiveDotEl) tickerLiveDotEl.classList.add('active');
+    if (tickerLinkEl) {
+      tickerLinkEl.textContent = 'Mint now →';
+      tickerLinkEl.href = MINT_URL;
+      tickerLinkEl.style.display = 'inline';
     }
 
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor((diff % 86400000) / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-
-    dEl.textContent = pad(days);
-    hEl.textContent = pad(hours);
-    mEl.textContent = pad(mins);
-    sEl.textContent = pad(secs);
+    pollMintStatus();
+    statusTimer = setInterval(pollMintStatus, MINT_STATUS_POLL_MS);
   }
 
-  render();
-  timer = setInterval(render, 1000);
+  // --- Poll mint-status.json for live minted count / sold-out state ---
+  async function pollMintStatus() {
+    const status = await fetchMintStatus();
+    if (!status) return;
+
+    const { minted, totalSupply, soldOut } = status;
+    const pct = Math.max(0, Math.min(100, (minted / totalSupply) * 100));
+
+    if (mintedCountEl) mintedCountEl.textContent = formatCount(minted);
+    if (supplyCountEl) supplyCountEl.textContent = formatCount(totalSupply);
+    if (progressFillEl) progressFillEl.style.width = pct + '%';
+
+    const sold = soldOut || minted >= totalSupply;
+
+    if (tickerLabelEl) {
+      tickerLabelEl.textContent = sold
+        ? 'SOLD OUT'
+        : formatCount(minted) + ' / ' + formatCount(totalSupply) + ' Awakened';
+    }
+
+    if (sold) {
+      if (statusTimer) clearInterval(statusTimer);
+      if (labelEl) labelEl.textContent = 'SOLD OUT — THE AWAKENING IS COMPLETE';
+      if (mintBtn) mintBtn.style.display = 'none';
+      // Give the "sold out" state a beat on screen before removing the
+      // section + ticker entirely, per the mint-conclusion behavior.
+      setTimeout(removeMintUI, 4000);
+    }
+  }
+
+  if (!labelEl || !countdownEl) {
+    // Countdown markup missing — still try to poll status in case mint is live.
+    pollMintStatus();
+    statusTimer = setInterval(pollMintStatus, MINT_STATUS_POLL_MS);
+    return;
+  }
+
+  renderCountdown();
+  countdownTimer = setInterval(renderCountdown, 1000);
 })();
 
 // Art contest — fully remove the entire section (and its leading divider)
